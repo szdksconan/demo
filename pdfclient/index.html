@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>Insert title here</title>
+		<script src="jquery.js"></script>
+		<script src="pdf/pdf.js"></script>
+		
+		<style>
+			.canvas-container{}
+			.canvas-container canvas{}
+		</style>
+	</head>
+	<body>
+		<a onclick="upload()">上传</a>
+		<input type="file" value="选择" id="fileChoose" />
+		<div class="canvas-container">
+			
+		</div>
+	</body>
+	<script>
+		var totalPages = 0,totalLoaded = 0,pages;
+		$("#fileChoose").change(function(e){
+			$(".canvas-container canvas").remove();
+			PDFJS.getDocument({url:URL.createObjectURL(this.files[0])}).then(function(pdf){
+				totalPages = pdf.pdfInfo.numPages;
+				pages = new Array(totalPages)
+				for(var i=1;i<=pdf.pdfInfo.numPages;i++){
+					//console.log(pdf);
+					pdf.getPage(i).then(function (page) {
+						//console.log(page.commonObjs.objs);
+						var canvas = ($('<canvas></canvas>').appendTo('.canvas-container'))[0];
+						
+						var scale = 1;
+						var viewport = page.getViewport(scale);
+						// Prepare canvas using PDF page dimensions.
+						//var canvas = document.getElementById('c'+(page.pageIndex+1));
+						var context = canvas.getContext('2d');
+						canvas.height = viewport.height;
+						canvas.width = viewport.width;
+						// Render PDF page into canvas context.
+						var renderContext = {
+							canvasContext: context,
+							viewport: viewport
+						};
+						console.log(viewport);
+						page.render(renderContext).then(function(){
+							pages[page.pageIndex] = page;
+							totalLoaded++;
+							if(totalLoaded==totalPages){
+								console.log(pages);	
+							}
+							console.log(page.pageIndex);	
+							
+							var canvas = $('.canvas-container canvas:eq('+page.pageIndex+')')[0];
+							var ctx = canvas.getContext('2d');
+							var into = document.createElement("canvas");
+							var ctx2 = into.getContext('2d');
+							into.width = (370)*scale;
+							into.height = (245)*scale;
+							
+							var img = new Image();
+							img.src = 'http://static.sunyuki.com/img/static/phone/farm/canvas-watermark.png';
+							img.onload = function() {
+							    console.log(1);
+							    ctx2.drawImage(img,0,0,370*scale,245*scale);
+							    var pattern = ctx.createPattern(into, 'repeat');
+							    //ctx.rotate(-30*Math.PI/180);
+							    ctx.fillStyle = pattern;
+							    var moveLeft = Math.tan(30/180*Math.PI)*page.view[3];
+							    var _ac = page.view[3]/Math.cos(30/180*Math.PI);
+							    
+							    ctx.fillRect(0, 0, page.view[2], page.view[3]);
+							    console.log(page.view[2],page.view[3]);
+							};
+							
+						});
+						
+					});
+				}
+			});
+		});
+		
+		function upload(){
+			var base64Arr = [];
+			$('.canvas-container canvas').each(function(){
+				var base64str = this.toDataURL("image/jpeg").split(',')[1];
+				base64Arr.push(base64str);
+			});
+			$.ajax({
+				url:SYK_HTML5_BASEURL+"/v0/my_account/feedback",
+				method:"post",
+				data:JSON.stringify({
+					content:'123',
+					categoryId:9,
+					imgBytes:base64Arr
+				})
+			});
+		}
+	</script>
+</html>
